@@ -18,6 +18,9 @@ export default function App() {
   const [demoMovies, setDemoMovies] = useState([]);
   const [demoShows, setDemoShows] = useState([]);
 
+  const [searchQuery, setSearchQuery] = useState(""); 
+  const [searchResults, setSearchResults] = useState([]);
+
   const [view, setView] = useState("home");
 
   const [heroItems, setHeroItems] = useState([]); // [{ backdropUrl, title }]
@@ -96,6 +99,41 @@ export default function App() {
       .catch((err) => console.error(err));
   }
 
+  const handleSearch = async (e) => {
+    // Only search if user presses Enter and box is not empty
+    if (e.key === 'Enter' && searchQuery.trim().length > 0) {
+      
+      const options = {
+        method: 'GET',
+        headers: {
+           accept: 'application/json',
+           Authorization: `Bearer ${TMDB_BEARER}`
+        }
+      };
+
+      try {
+        // We use 'multi' to search for both movies and tv shows
+        const response = await fetch(`https://api.themoviedb.org/3/search/multi?query=${searchQuery}&include_adult=false&language=en-US&page=1`, options);
+        const data = await response.json();
+        
+        // Format the data exactly like your other movies
+        const formattedResults = data.results
+          .filter(item => item.poster_path) // Only keep items with images
+          .map((item, index) => ({
+             id: item.id,
+             title: item.title || item.name, // Handle Movie vs TV titles
+             rank: null, // Search results don't need a rank number
+             poster: "https://image.tmdb.org/t/p/original" + item.poster_path
+          }));
+
+        setSearchResults(formattedResults);
+        setView("search"); // Switch the view to show results
+      } catch (error) {
+        console.error("Search failed:", error);
+      }
+    }
+  }
+
 
 
   useEffect(() => {
@@ -135,6 +173,27 @@ export default function App() {
     );
   }
 
+  if (view === "tvshows") {
+    return (
+      <MovieDetails 
+        movies={demoShows} 
+        onBack={() => setView("home")} 
+      />
+    );
+  }
+
+  // If view is 'search', show the search results (reusing the same component!)
+  if (view === "search") {
+    return (
+      <MovieDetails 
+        movies={searchResults} 
+        onBack={() => {
+            setView("home"); 
+            setSearchQuery(""); // Clear search when going back
+        }} 
+      />
+    );
+  }
   return (
     <div className="screen">
       <header className="topbar">
@@ -143,7 +202,12 @@ export default function App() {
       <div className="searchWrap">
         <div className="search">
           <span className="icon">⌕</span>
-          <input placeholder="Search movies..." />
+          <input 
+            placeholder="Search movies..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearch} 
+          />
         </div>
       </div>
 
@@ -176,7 +240,9 @@ export default function App() {
       <section className="section">
         <div className="sectionHeader">
           <div className="sectionTitle">TV SHOWS</div>
-          <button className="seeAll">See all</button>
+          <button className="seeAll" onClick={() => setView("tvshows")}>
+            See all
+          </button>
         </div>
         <HorizontalRow items={demoShows} />
       </section>
